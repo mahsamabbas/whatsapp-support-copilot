@@ -8,6 +8,7 @@ from app.config import CORS_ORIGINS
 from app.db import (
     add_knowledge,
     create_bot,
+    delete_knowledge,
     get_bot,
     get_connection,
     init_db,
@@ -165,6 +166,11 @@ async def upload_knowledge(
     try:
         _build_index_for_bot(request.app.state.index_store, bot_id)
     except Exception as exc:
+        conn = get_connection()
+        try:
+            delete_knowledge(conn, document["id"])
+        finally:
+            conn.close()
         raise HTTPException(
             status_code=503, detail="Knowledge index is temporarily unavailable."
         ) from exc

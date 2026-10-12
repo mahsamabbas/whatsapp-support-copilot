@@ -107,6 +107,11 @@ def list_knowledge(conn: sqlite3.Connection, bot_id: int) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+def delete_knowledge(conn: sqlite3.Connection, document_id: int) -> None:
+    conn.execute("DELETE FROM knowledge_documents WHERE id = ?", (document_id,))
+    conn.commit()
+
+
 def list_threads(conn: sqlite3.Connection, bot_id: int) -> list[sqlite3.Row]:
     return conn.execute(
         """

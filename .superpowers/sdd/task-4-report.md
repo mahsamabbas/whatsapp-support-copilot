@@ -28,3 +28,24 @@ backend/.venv/bin/python -m pytest backend/tests -q
 ## Concerns
 
 The test run retains the pre-existing upstream `langchain_community` deprecation warning from FAISS imports.
+
+## Review fix: transactional knowledge upload
+
+- On a failed FAISS rebuild after an upload, the API deletes the newly inserted
+  knowledge document and returns 503. The previously swapped-in index remains
+  untouched.
+- Added an API regression test that establishes an index, forces the second
+  rebuild to fail, verifies the failed document is absent from the knowledge
+  listing, and verifies the original index remains available.
+
+## Review fix verification
+
+```text
+backend/.venv/bin/python -m pytest backend/tests/test_bots_knowledge.py -q
+5 passed, 1 warning in 0.14s
+
+backend/.venv/bin/python -m pytest backend/tests -q
+14 passed, 1 warning in 0.16s
+```
+
+The warning is the existing `langchain_community` FAISS deprecation warning.

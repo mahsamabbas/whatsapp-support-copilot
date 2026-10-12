@@ -46,3 +46,44 @@ def test_upload_rebuilds_index_and_lists_document(client):
     assert documents.status_code == 200
     assert [doc["filename"] for doc in documents.json()] == ["policy.md"]
     assert client.app.state.index_store.has_index(bot_id)
+
+
+def test_failed_upload_rolls_back_document_and_preserves_existing_index(
+    client, monkeypatch
+):
+    bot_id = client.post("/bots", json={"name": "Acme"}).json()["id"]
+    first_upload = client.post(
+        f"/bots/{bot_id}/knowledge",
+        files={
+            "file": (
+                "policy.md",
+                io.BytesIO(
+                    b"Shipping takes 3 to 5 business days for standard orders. " * 10
+                ),
+                "text/markdown",
+            )
+        },
+    )
+    assert first_upload.status_code == 200
+    assert client.app.state.index_store.has_index(bot_id)
+
+    monkeypatch.setattr(
+        client.app.state.index_store,
+        "build_for_bot",
+        lambda *_: (_ for _ in ()).throw(RuntimeError("FAISS unavailable")),
+    )
+    failed_upload = client.post(
+        f"/bots/{bot_id}/knowledge",
+        files={
+            "file": (
+                "returns.md",
+                io.BytesIO(b"Returns are accepted within 30 days of delivery. " * 10),
+                "text/markdown",
+            )
+        },
+    )
+
+    assert failed_upload.status_code == 503
+    documents = client.get(f"/bots/{bot_id}/knowledge")
+    assert [document["filename"] for document in documents.json()] == ["policy.md"]
+    assert client.app.state.index_store.has_index(bot_id)
