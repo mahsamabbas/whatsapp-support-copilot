@@ -859,6 +859,89 @@ button {
   color: var(--ink-faint);
 }
 
+.draft-empty {
+  margin: 1rem 0;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+/* .draft-error — inline 409/503/validation feedback inside the panel */
+.draft-error {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.6rem;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.draft-reason {
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.6rem;
+  border: 1px solid #f2b8b5;
+  background: var(--danger-soft);
+}
+
+.draft-reason__label {
+  margin: 0 0 0.25rem;
+  font-size: 0.67rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--danger);
+}
+
+.draft-reason__text {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--ink);
+}
+
+.source-list {
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.source-item {
+  padding: 0.5rem 0.65rem;
+  border-radius: 0.5rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
+.draft-textarea {
+  width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--surface);
+  font: 500 0.85rem var(--font-ui);
+  line-height: 1.45;
+  color: var(--ink);
+  resize: vertical;
+}
+
+.draft-textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.draft-textarea:disabled {
+  background: var(--panel);
+  color: var(--ink-soft);
+}
+
 /* .shimmer — animated skeleton while a draft is generating */
 .shimmer-stack {
   display: flex;
@@ -927,6 +1010,35 @@ button {
   filter: brightness(1.04);
 }
 
+.btn-generate:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.15) brightness(0.95);
+}
+
+.btn-approve {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: 1px solid var(--accent-deep);
+  border-radius: 0.65rem;
+  padding: 0.6rem 1rem;
+  font: 700 0.84rem var(--font-ui);
+  color: var(--accent-deep);
+  background: var(--accent-soft);
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.btn-approve:hover {
+  filter: brightness(0.97);
+}
+
+.btn-approve:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* .pulse-cta — soft scale pulse to draw the eye to Generate */
 .pulse-cta {
   animation: pulseCta 2.4s ease-in-out infinite;
@@ -956,6 +1068,11 @@ button {
 
 .btn-escalate:hover {
   background: var(--danger-soft);
+}
+
+.btn-escalate:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 /* ---------------------------------------------------------------- */

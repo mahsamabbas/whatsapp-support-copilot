@@ -2,9 +2,14 @@ import { useEffect, useState } from 'react'
 
 import { BotModal } from './components/BotModal'
 import { ChatPane } from './components/ChatPane'
+import { DraftPanel, type DraftView } from './components/DraftPanel'
 import { ThreadList, type ThreadWithRole } from './components/ThreadList'
 import { TopBar } from './components/TopBar'
 import {
+  ApiError,
+  approveDraft,
+  escalateThread,
+  generateDraft,
   getThread,
   listBots,
   listThreads,
@@ -15,6 +20,46 @@ import {
 } from './lib/api'
 
 type Pane = 'chats' | 'thread' | 'draft'
+
+const AUTO_GENERATE_DEBOUNCE_MS = 650
+
+function hydrateDraftView(thread: ThreadDetail): DraftView | null {
+  const latest = thread.latest_draft
+  if (!latest) return null
+
+  let sources: string[] = []
+  try {
+    const parsed: unknown = JSON.parse(latest.sources_json)
+    if (Array.isArray(parsed)) {
+      sources = parsed.filter((item): item is string => typeof item === 'string')
+    }
+  } catch {
+    sources = []
+  }
+
+  const escalated = thread.status === 'escalated'
+  return {
+    draftId: latest.id,
+    body: latest.body,
+    confidence: latest.confidence,
+    sources,
+    escalated,
+    reason: escalated ? 'This conversation was escalated to a human agent.' : null,
+  }
+}
+
+function describeApiError(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.status === 409) {
+      return 'No knowledge base is indexed for this bot yet — upload a policy document first.'
+    }
+    if (error.status === 503) {
+      return 'The AI backend (Ollama) is unavailable right now. Please try again shortly.'
+    }
+    return error.message || `Request failed with status ${error.status}.`
+  }
+  return 'Something went wrong. Please try again.'
+}
 
 export default function App() {
   const [activePane, setActivePane] = useState<Pane>('thread')
@@ -28,6 +73,11 @@ export default function App() {
   const [pulseGenerate, setPulseGenerate] = useState(false)
   const [isSending, setIsSending] = useState(false)
   const [threadError, setThreadError] = useState<string | null>(null)
+  const [draftView, setDraftView] = useState<DraftView | null>(null)
+  const [draftLoading, setDraftLoading] = useState(false)
+  const [draftError, setDraftError] = useState<string | null>(null)
+  const [isApprovingDraft, setIsApprovingDraft] = useState(false)
+  const [isEscalatingThread, setIsEscalatingThread] = useState(false)
 
   const loadBots = async () => {
     try {
@@ -96,17 +146,35 @@ export default function App() {
     return detail
   }
 
+  const refreshThreadsList = async () => {
+    if (activeBotId === null) return
+    const refreshedThreads = await listThreads(activeBotId)
+    setThreads((currentThreads) =>
+      refreshedThreads.map((thread) => ({
+        ...thread,
+        last_role: currentThreads.find((current) => current.id === thread.id)?.last_role,
+      })),
+    )
+  }
+
   useEffect(() => {
     if (selectedThreadId === null) return
     const threadId = selectedThreadId
     let cancelled = false
     setThreadError(null)
-    void loadThread(threadId, () => cancelled).catch(() => {
-      if (!cancelled) {
-        setSelectedThread(null)
-        setThreadError('Could not load this conversation.')
-      }
-    })
+    setDraftError(null)
+    setPulseGenerate(false)
+    void loadThread(threadId, () => cancelled)
+      .then((detail) => {
+        if (!cancelled) setDraftView(hydrateDraftView(detail))
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSelectedThread(null)
+          setDraftView(null)
+          setThreadError('Could not load this conversation.')
+        }
+      })
     return () => {
       cancelled = true
     }
@@ -130,23 +198,92 @@ export default function App() {
     try {
       await postMessage(selectedThreadId, role, body)
       await loadThread(selectedThreadId)
-      if (activeBotId !== null) {
-        const refreshedThreads = await listThreads(activeBotId)
-        setThreads((currentThreads) =>
-          refreshedThreads.map((thread) => ({
-            ...thread,
-            last_role: currentThreads.find((current) => current.id === thread.id)?.last_role,
-          })),
-        )
-      }
+      await refreshThreadsList()
       setFlashThreadId(selectedThreadId)
-      setPulseGenerate(true)
+      if (role === 'customer') {
+        setDraftError(null)
+        setDraftView(null)
+        setPulseGenerate(true)
+      }
     } catch {
       setThreadError('Could not send the message. Please try again.')
     } finally {
       setIsSending(false)
     }
   }
+
+  const handleGenerateDraft = async (threadId: number) => {
+    setPulseGenerate(false)
+    setDraftError(null)
+    setDraftLoading(true)
+    try {
+      const result = await generateDraft(threadId)
+      if (threadId !== selectedThreadId) return
+      setDraftView({
+        draftId: result.draft_id,
+        body: result.body,
+        confidence: result.confidence,
+        sources: result.sources,
+        escalated: result.escalated,
+        reason: result.reason,
+      })
+      await loadThread(threadId)
+      await refreshThreadsList()
+    } catch (error) {
+      if (threadId === selectedThreadId) setDraftError(describeApiError(error))
+    } finally {
+      if (threadId === selectedThreadId) setDraftLoading(false)
+    }
+  }
+
+  const handleApproveDraft = async (threadId: number, body: string) => {
+    setDraftError(null)
+    setIsApprovingDraft(true)
+    try {
+      await approveDraft(threadId, body)
+      await loadThread(threadId)
+      await refreshThreadsList()
+      setDraftView(null)
+    } catch (error) {
+      setDraftError(describeApiError(error))
+    } finally {
+      setIsApprovingDraft(false)
+    }
+  }
+
+  const handleEscalateDraft = async (threadId: number, reason?: string) => {
+    setDraftError(null)
+    setIsEscalatingThread(true)
+    try {
+      await escalateThread(threadId, reason)
+      await loadThread(threadId)
+      await refreshThreadsList()
+      setDraftView((current) => ({
+        draftId: current?.draftId ?? -1,
+        body: current?.body ?? '',
+        confidence: current?.confidence ?? 0,
+        sources: current?.sources ?? [],
+        escalated: true,
+        reason: reason?.trim() ? reason.trim() : 'Escalated by agent.',
+      }))
+    } catch (error) {
+      setDraftError(describeApiError(error))
+    } finally {
+      setIsEscalatingThread(false)
+    }
+  }
+
+  // Prefer auto-generating a draft shortly after a new customer message
+  // (set via pulseGenerate) instead of waiting for a manual click.
+  useEffect(() => {
+    if (!pulseGenerate || selectedThreadId === null || draftLoading) return
+    const threadId = selectedThreadId
+    const timer = window.setTimeout(() => {
+      void handleGenerateDraft(threadId)
+    }, AUTO_GENERATE_DEBOUNCE_MS)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pulseGenerate, selectedThreadId, draftLoading])
 
   const selectedThreadSummary =
     threads.find((thread) => thread.id === selectedThreadId) ?? null
@@ -178,55 +315,25 @@ export default function App() {
           onSend={handleSend}
         />
 
-        {/* Right pane — copilot draft panel */}
-        <section className="pane pane-draft" data-active={activePane === 'draft'}>
-          <div className="draft-header">
-            <h2 className="draft-title">Copilot</h2>
-            <p className="draft-sub">Grounded suggestions for this conversation</p>
-          </div>
-
-          <div className="draft-body">
-            <div className="confidence">
-              <div className="confidence__row">
-                <span>Confidence</span>
-                <strong>86%</strong>
-              </div>
-              <div className="confidence__bar">
-                <div className="confidence__fill" style={{ width: '86%' }} />
-              </div>
-            </div>
-
-            <div>
-              <p className="draft-section-label">Suggested reply</p>
-              <div className="suggested-reply" style={{ marginTop: '0.4rem' }}>
-                <p className="suggested-reply__label">Grounded in Order Policy FAQ</p>
-                <p className="suggested-reply__text">
-                  Thanks for your patience, Amara — I can see order #4821 is still in our fulfillment
-                  queue. I've escalated it for same-day dispatch and will send tracking the moment it
-                  ships.
-                </p>
-              </div>
-            </div>
-
-            <div>
-              <p className="draft-section-label">Generating next draft</p>
-              <div className="shimmer-stack" style={{ marginTop: '0.4rem' }}>
-                <div className="shimmer w-full" />
-                <div className="shimmer w-80" />
-                <div className="shimmer w-60" />
-              </div>
-            </div>
-          </div>
-
-          <div className="draft-actions">
-            <button className={`btn-generate${pulseGenerate ? ' pulse-cta' : ''}`} type="button">
-              ✦ Generate reply
-            </button>
-            <button className="btn-escalate" type="button">
-              Escalate to human
-            </button>
-          </div>
-        </section>
+        <DraftPanel
+          thread={selectedThread}
+          draft={draftView}
+          isGenerating={draftLoading}
+          isApproving={isApprovingDraft}
+          isEscalating={isEscalatingThread}
+          error={draftError}
+          pulseGenerate={pulseGenerate}
+          active={activePane === 'draft'}
+          onGenerate={() => {
+            if (selectedThreadId !== null) void handleGenerateDraft(selectedThreadId)
+          }}
+          onApprove={(body) => {
+            if (selectedThreadId !== null) void handleApproveDraft(selectedThreadId, body)
+          }}
+          onEscalate={(reason) => {
+            if (selectedThreadId !== null) void handleEscalateDraft(selectedThreadId, reason)
+          }}
+        />
       </div>
       {threadError && (
         <p className="thread-error" role="alert">
