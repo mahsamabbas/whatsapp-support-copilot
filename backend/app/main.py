@@ -6,22 +6,34 @@ from fastapi.responses import JSONResponse
 
 from app.config import CORS_ORIGINS
 from app.db import (
+    add_message,
     add_knowledge,
+    create_thread,
     create_bot,
     delete_knowledge,
     get_bot,
     get_connection,
+    get_latest_draft,
+    get_thread,
     init_db,
     list_bots,
     list_knowledge,
+    list_messages,
+    list_threads,
     seed_if_empty,
 )
 from app.index_store import IndexStore
 from app.models import (
     BotCreate,
     BotResponse,
+    DraftResponse,
     KnowledgeDocumentResponse,
+    MessageCreate,
+    MessageResponse,
     StatusResponse,
+    ThreadCreate,
+    ThreadDetailResponse,
+    ThreadResponse,
 )
 from app.ollama_clients import ollama_ok
 from app.validation import ValidationError, validate_knowledge_bytes
@@ -132,6 +144,64 @@ def create_bot_route(payload: BotCreate) -> BotResponse:
 @app.get("/bots/{bot_id}", response_model=BotResponse)
 def bot(bot_id: int) -> BotResponse:
     return _model(BotResponse, _bot_or_404(bot_id))
+
+
+@app.get("/bots/{bot_id}/threads", response_model=list[ThreadResponse])
+def threads(bot_id: int) -> list[ThreadResponse]:
+    _bot_or_404(bot_id)
+    conn = get_connection()
+    try:
+        return [_model(ThreadResponse, thread) for thread in list_threads(conn, bot_id)]
+    finally:
+        conn.close()
+
+
+@app.post("/bots/{bot_id}/threads", response_model=ThreadResponse)
+def create_thread_route(bot_id: int, payload: ThreadCreate) -> ThreadResponse:
+    _bot_or_404(bot_id)
+    conn = get_connection()
+    try:
+        return _model(ThreadResponse, create_thread(conn, bot_id, payload.customer_name))
+    finally:
+        conn.close()
+
+
+@app.get("/threads/{thread_id}", response_model=ThreadDetailResponse)
+def thread_detail(thread_id: int) -> ThreadDetailResponse:
+    conn = get_connection()
+    try:
+        thread = get_thread(conn, thread_id)
+        if thread is None:
+            raise HTTPException(status_code=404, detail="Thread not found.")
+        return ThreadDetailResponse(
+            **_model(ThreadResponse, thread).model_dump(),
+            messages=[
+                _model(MessageResponse, message)
+                for message in list_messages(conn, thread_id)
+            ],
+            latest_draft=(
+                _model(DraftResponse, draft)
+                if (draft := get_latest_draft(conn, thread_id)) is not None
+                else None
+            ),
+        )
+    finally:
+        conn.close()
+
+
+@app.post("/threads/{thread_id}/messages", response_model=MessageResponse)
+def create_message(thread_id: int, payload: MessageCreate) -> MessageResponse:
+    if not payload.body.strip():
+        raise HTTPException(status_code=400, detail="Message body cannot be blank.")
+    conn = get_connection()
+    try:
+        if get_thread(conn, thread_id) is None:
+            raise HTTPException(status_code=404, detail="Thread not found.")
+        return _model(
+            MessageResponse, add_message(conn, thread_id, payload.role, payload.body)
+        )
+    finally:
+        conn.close()
 
 
 @app.get("/bots/{bot_id}/knowledge", response_model=list[KnowledgeDocumentResponse])
