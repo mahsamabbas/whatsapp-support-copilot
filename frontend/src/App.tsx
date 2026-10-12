@@ -346,6 +346,7 @@ export default function App() {
           latestDraft={selectedThread?.latest_draft ?? null}
           flashThreadId={flashThreadId}
           active={activePane === 'chats'}
+          hasActiveBot={activeBotId !== null}
           onSelect={handleSelectThread}
         />
 

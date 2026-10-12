@@ -33,7 +33,7 @@ export function TopBar({ bots, activeBotId, onBotChange, onCreateBot }: TopBarPr
     }
   }, [activeBotId, bots])
 
-  const knowledgeLabel = hasKnowledge ? 'Ready' : 'Needs docs'
+  const knowledgeLabel = hasKnowledge === true ? 'Ready' : 'Needs docs'
 
   return (
     <header className="topbar">
@@ -65,7 +65,9 @@ export function TopBar({ bots, activeBotId, onBotChange, onCreateBot }: TopBarPr
             ))
           )}
         </select>
-        <span className={`knowledge-pill${hasKnowledge ? ' ready' : ''}`}>{knowledgeLabel}</span>
+        {hasKnowledge !== null && (
+          <span className={`knowledge-pill${hasKnowledge ? ' ready' : ''}`}>{knowledgeLabel}</span>
+        )}
         <button className="btn-create-bot" type="button" onClick={onCreateBot}>
           Create bot
         </button>

@@ -11,6 +11,7 @@ interface ThreadListProps {
   latestDraft: Draft | null
   flashThreadId: number | null
   active: boolean
+  hasActiveBot: boolean
   onSelect: (threadId: number) => void
 }
 
@@ -34,6 +35,7 @@ export function ThreadList({
   latestDraft,
   flashThreadId,
   active,
+  hasActiveBot,
   onSelect,
 }: ThreadListProps) {
   return (
@@ -63,13 +65,21 @@ export function ThreadList({
                 </div>
                 <p className="thread-preview">{thread.last_message_preview ?? 'No messages yet'}</p>
                 <div className="thread-row__bottom">
-                  <span className={`chip ${badge}`}>{badgeLabels[badge]}</span>
+                  <span className={`chip ${badge}${badge === 'escalated' ? ' badge-in' : ''}`}>
+                    {badgeLabels[badge]}
+                  </span>
                 </div>
               </div>
             </button>
           )
         })}
-        {threads.length === 0 && <p className="thread-list__empty">No conversations yet.</p>}
+        {threads.length === 0 && (
+          <p className="thread-list__empty">
+            {hasActiveBot
+              ? 'No conversations yet. Customer messages will appear here.'
+              : 'No bot selected. Create a bot to start helping customers.'}
+          </p>
+        )}
       </nav>
     </section>
   )

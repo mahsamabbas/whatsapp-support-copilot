@@ -30,6 +30,9 @@ cp .env.example .env
 docker compose up --build
 ```
 
+Use the root `.env.example` for Docker Compose; use `backend/.env.example` when
+running local `uvicorn`.
+
 The SQLite database is persisted on the host at `backend/data/replydesk.db`.
 Stop the stack with `docker compose down`; omit `-v` so the demo data remains.
 
