@@ -1,0 +1,30 @@
+# ReplyDesk runs Ollama on the host, not in Compose.
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "${BACKEND_PORT:-8003}:8000"
+    environment:
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-qwen2.5:7b}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
+      SIMILARITY_CUTOFF: ${SIMILARITY_CUTOFF:-0.45}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3003,http://127.0.0.1:3003}
+    volumes:
+      - ./backend/data:/app/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Baked into the browser bundle; it cannot reach Docker service DNS.
+        VITE_API_BASE: ${VITE_API_BASE:-http://localhost:8003}
+    ports:
+      - "${FRONTEND_PORT:-3003}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
