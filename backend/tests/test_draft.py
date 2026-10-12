@@ -97,6 +97,28 @@ def test_approve_sets_thread_resolved(client, monkeypatch):
     assert detail["status"] == "resolved"
 
 
+def test_escalate_marks_approved_draft_escalated(client, monkeypatch):
+    tid = _first_thread_id(client)
+    store = client.app.state.index_store
+    monkeypatch.setattr(
+        store,
+        "retrieve",
+        lambda bot_id, query, k=3: [("Returns within 30 days.", 0.9)],
+    )
+    monkeypatch.setattr(store, "has_index", lambda bot_id: True)
+    fake_chat = MagicMock()
+    fake_chat.invoke.return_value = MagicMock(content="30-day returns apply.")
+    monkeypatch.setattr("app.draft_service.get_chat", lambda: fake_chat)
+
+    assert client.post(f"/threads/{tid}/draft").status_code == 200
+    assert client.post(f"/threads/{tid}/approve").status_code == 200
+    assert client.post(f"/threads/{tid}/escalate").status_code == 200
+
+    detail = client.get(f"/threads/{tid}").json()
+    assert detail["status"] == "escalated"
+    assert detail["latest_draft"]["state"] == "escalated"
+
+
 def test_draft_without_index_returns_409(client, monkeypatch):
     tid = _first_thread_id(client)
     store = client.app.state.index_store

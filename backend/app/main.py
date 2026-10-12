@@ -24,8 +24,8 @@ from app.db import (
     list_messages,
     list_threads,
     seed_if_empty,
+    set_draft_state,
     set_thread_status,
-    upsert_draft,
 )
 from app.draft_service import NoCustomerMessageError, NoIndexError, generate_draft
 from app.index_store import IndexStore
@@ -326,15 +326,8 @@ def escalate_thread_route(
         set_thread_status(conn, thread_id, "escalated")
 
         draft = get_latest_draft(conn, thread_id)
-        if draft is not None and draft["state"] == "pending":
-            upsert_draft(
-                conn,
-                thread_id,
-                draft["body"],
-                draft["confidence"],
-                draft["sources_json"],
-                state="escalated",
-            )
+        if draft is not None:
+            set_draft_state(conn, draft["id"], "escalated")
         return _thread_detail(conn, thread_id)
     finally:
         conn.close()

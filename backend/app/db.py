@@ -211,6 +211,14 @@ def approve_draft(conn: sqlite3.Connection, draft_id: int) -> sqlite3.Row | None
     return conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)).fetchone()
 
 
+def set_draft_state(
+    conn: sqlite3.Connection, draft_id: int, state: str
+) -> sqlite3.Row | None:
+    conn.execute("UPDATE drafts SET state = ? WHERE id = ?", (state, draft_id))
+    conn.commit()
+    return conn.execute("SELECT * FROM drafts WHERE id = ?", (draft_id,)).fetchone()
+
+
 def create_escalation(
     conn: sqlite3.Connection, thread_id: int, reason: str
 ) -> sqlite3.Row:
