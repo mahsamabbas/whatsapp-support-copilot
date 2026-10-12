@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { BotModal } from './components/BotModal'
 import { ChatPane } from './components/ChatPane'
@@ -78,6 +78,23 @@ export default function App() {
   const [draftError, setDraftError] = useState<string | null>(null)
   const [isApprovingDraft, setIsApprovingDraft] = useState(false)
   const [isEscalatingThread, setIsEscalatingThread] = useState(false)
+
+  // Always reflects the *current* selected thread, independent of any
+  // closures captured when an in-flight async request started. Async
+  // handlers must compare against this ref (not the `selectedThreadId`
+  // state value they closed over) before applying results, so a response
+  // for a thread the user has since navigated away from is ignored instead
+  // of clobbering the newly selected thread's state.
+  const selectedThreadIdRef = useRef<number | null>(null)
+  useEffect(() => {
+    selectedThreadIdRef.current = selectedThreadId
+  }, [selectedThreadId])
+
+  // Monotonic id bumped on every new draft generation request/thread switch
+  // so an older, still in-flight generateDraft call can tell it has been
+  // superseded (by a newer request OR a thread switch) and must not touch
+  // draftLoading/draftView/draftError.
+  const draftRequestIdRef = useRef(0)
 
   const loadBots = async () => {
     try {
@@ -164,6 +181,13 @@ export default function App() {
     setThreadError(null)
     setDraftError(null)
     setPulseGenerate(false)
+    // Invalidate any in-flight draft request for the previous thread and
+    // reset the loading flag immediately — otherwise, if that request's
+    // `finally` happens to run after this switch, the newly selected
+    // thread could be left stuck showing "Generating…" (or, conversely,
+    // the old thread's result could flip loading back on for this thread).
+    draftRequestIdRef.current += 1
+    setDraftLoading(false)
     void loadThread(threadId, () => cancelled)
       .then((detail) => {
         if (!cancelled) setDraftView(hydrateDraftView(detail))
@@ -192,21 +216,24 @@ export default function App() {
   }
 
   const handleSend = async (role: Message['role'], body: string) => {
-    if (selectedThreadId === null) return
+    const threadId = selectedThreadId
+    if (threadId === null) return
+    const isStale = () => threadId !== selectedThreadIdRef.current
     setIsSending(true)
     setThreadError(null)
     try {
-      await postMessage(selectedThreadId, role, body)
-      await loadThread(selectedThreadId)
+      await postMessage(threadId, role, body)
+      await loadThread(threadId, isStale)
+      if (isStale()) return
       await refreshThreadsList()
-      setFlashThreadId(selectedThreadId)
+      setFlashThreadId(threadId)
       if (role === 'customer') {
         setDraftError(null)
         setDraftView(null)
         setPulseGenerate(true)
       }
     } catch {
-      setThreadError('Could not send the message. Please try again.')
+      if (!isStale()) setThreadError('Could not send the message. Please try again.')
     } finally {
       setIsSending(false)
     }
@@ -216,9 +243,15 @@ export default function App() {
     setPulseGenerate(false)
     setDraftError(null)
     setDraftLoading(true)
+    const requestId = ++draftRequestIdRef.current
+    // Stale if the user switched threads since this request started, OR a
+    // newer generateDraft request (e.g. Regenerate clicked again) has
+    // superseded this one.
+    const isStale = () =>
+      threadId !== selectedThreadIdRef.current || requestId !== draftRequestIdRef.current
     try {
       const result = await generateDraft(threadId)
-      if (threadId !== selectedThreadId) return
+      if (isStale()) return
       setDraftView({
         draftId: result.draft_id,
         body: result.body,
@@ -227,36 +260,45 @@ export default function App() {
         escalated: result.escalated,
         reason: result.reason,
       })
-      await loadThread(threadId)
+      await loadThread(threadId, isStale)
+      if (isStale()) return
       await refreshThreadsList()
     } catch (error) {
-      if (threadId === selectedThreadId) setDraftError(describeApiError(error))
+      if (!isStale()) setDraftError(describeApiError(error))
     } finally {
-      if (threadId === selectedThreadId) setDraftLoading(false)
+      // Only the request that still owns the active thread+generation slot
+      // may clear the loading flag — otherwise a stale request finishing
+      // late could either leave the new thread stuck "Generating…" or
+      // incorrectly flip loading back on for it.
+      if (!isStale()) setDraftLoading(false)
     }
   }
 
   const handleApproveDraft = async (threadId: number, body: string) => {
+    const isStale = () => threadId !== selectedThreadIdRef.current
     setDraftError(null)
     setIsApprovingDraft(true)
     try {
       await approveDraft(threadId, body)
-      await loadThread(threadId)
+      await loadThread(threadId, isStale)
+      if (isStale()) return
       await refreshThreadsList()
       setDraftView(null)
     } catch (error) {
-      setDraftError(describeApiError(error))
+      if (!isStale()) setDraftError(describeApiError(error))
     } finally {
       setIsApprovingDraft(false)
     }
   }
 
   const handleEscalateDraft = async (threadId: number, reason?: string) => {
+    const isStale = () => threadId !== selectedThreadIdRef.current
     setDraftError(null)
     setIsEscalatingThread(true)
     try {
       await escalateThread(threadId, reason)
-      await loadThread(threadId)
+      await loadThread(threadId, isStale)
+      if (isStale()) return
       await refreshThreadsList()
       setDraftView((current) => ({
         draftId: current?.draftId ?? -1,
@@ -267,7 +309,7 @@ export default function App() {
         reason: reason?.trim() ? reason.trim() : 'Escalated by agent.',
       }))
     } catch (error) {
-      setDraftError(describeApiError(error))
+      if (!isStale()) setDraftError(describeApiError(error))
     } finally {
       setIsEscalatingThread(false)
     }
