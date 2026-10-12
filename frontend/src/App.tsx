@@ -1,86 +1,33 @@
 import { useEffect, useState } from 'react'
 
 import { BotModal } from './components/BotModal'
+import { ChatPane } from './components/ChatPane'
+import { ThreadList, type ThreadWithRole } from './components/ThreadList'
 import { TopBar } from './components/TopBar'
-import { listBots, type Bot } from './lib/api'
+import {
+  getThread,
+  listBots,
+  listThreads,
+  postMessage,
+  type Bot,
+  type Message,
+  type ThreadDetail,
+} from './lib/api'
 
 type Pane = 'chats' | 'thread' | 'draft'
-
-interface ThreadPreview {
-  id: string
-  name: string
-  preview: string
-  time: string
-  unread: number
-  status: 'open' | 'escalated'
-  active?: boolean
-  justUpdated?: boolean
-}
-
-interface Message {
-  id: string
-  from: 'customer' | 'agent'
-  text: string
-  time: string
-}
-
-const THREADS: ThreadPreview[] = [
-  {
-    id: 't1',
-    name: 'Amara Chen',
-    preview: 'My order #4821 still shows "processing" after 5 days…',
-    time: '2m',
-    unread: 2,
-    status: 'escalated',
-    active: true,
-    justUpdated: true,
-  },
-  {
-    id: 't2',
-    name: 'Diego Fernandez',
-    preview: 'Thank you! That solved it 🙌',
-    time: '14m',
-    unread: 0,
-    status: 'open',
-  },
-  {
-    id: 't3',
-    name: 'Priya Nair',
-    preview: 'Can I get a refund instead of a replacement?',
-    time: '41m',
-    unread: 1,
-    status: 'open',
-  },
-  {
-    id: 't4',
-    name: 'Jonas Weber',
-    preview: 'Is the warranty international?',
-    time: '1h',
-    unread: 0,
-    status: 'open',
-  },
-  {
-    id: 't5',
-    name: 'Grace Okafor',
-    preview: "Still waiting on a reply from yesterday's chat.",
-    time: '3h',
-    unread: 0,
-    status: 'open',
-  },
-]
-
-const MESSAGES: Message[] = [
-  { id: 'm1', from: 'customer', text: 'Hi! My order #4821 still shows "processing" after 5 days.', time: '09:12' },
-  { id: 'm2', from: 'customer', text: 'Can someone check what is going on? It was supposed to ship already.', time: '09:12' },
-  { id: 'm3', from: 'agent', text: "Hi Amara, thanks for flagging this — let me pull up order #4821 right now.", time: '09:14' },
-  { id: 'm4', from: 'customer', text: 'Appreciate it, this is a gift so timing matters 🙏', time: '09:15' },
-]
 
 export default function App() {
   const [activePane, setActivePane] = useState<Pane>('thread')
   const [bots, setBots] = useState<Bot[]>([])
   const [activeBotId, setActiveBotId] = useState<number | null>(null)
   const [isBotModalOpen, setIsBotModalOpen] = useState(false)
+  const [threads, setThreads] = useState<ThreadWithRole[]>([])
+  const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null)
+  const [selectedThread, setSelectedThread] = useState<ThreadDetail | null>(null)
+  const [flashThreadId, setFlashThreadId] = useState<number | null>(null)
+  const [pulseGenerate, setPulseGenerate] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const [threadError, setThreadError] = useState<string | null>(null)
 
   const loadBots = async () => {
     try {
@@ -102,6 +49,100 @@ export default function App() {
     void loadBots()
   }, [])
 
+  useEffect(() => {
+    if (activeBotId === null) {
+      setThreads([])
+      setSelectedThreadId(null)
+      setSelectedThread(null)
+      return
+    }
+
+    let cancelled = false
+    setThreadError(null)
+    void listThreads(activeBotId)
+      .then((nextThreads) => {
+        if (cancelled) return
+        setThreads(nextThreads)
+        setSelectedThreadId((currentThreadId) =>
+          currentThreadId !== null && nextThreads.some((thread) => thread.id === currentThreadId)
+            ? currentThreadId
+            : (nextThreads[0]?.id ?? null),
+        )
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setThreads([])
+          setSelectedThreadId(null)
+          setSelectedThread(null)
+          setThreadError('Could not load conversations.')
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeBotId])
+
+  const loadThread = async (threadId: number) => {
+    const detail = await getThread(threadId)
+    const lastRole = detail.messages.at(-1)?.role
+    setSelectedThread(detail)
+    setThreads((currentThreads) =>
+      currentThreads.map((thread) =>
+        thread.id === threadId ? { ...thread, last_role: lastRole } : thread,
+      ),
+    )
+    return detail
+  }
+
+  useEffect(() => {
+    if (selectedThreadId === null) return
+    let cancelled = false
+    setThreadError(null)
+    void loadThread(selectedThreadId).catch(() => {
+      if (!cancelled) {
+        setSelectedThread(null)
+        setThreadError('Could not load this conversation.')
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [selectedThreadId])
+
+  const handleSelectThread = (threadId: number) => {
+    setSelectedThreadId(threadId)
+    setActivePane('thread')
+  }
+
+  const handleSend = async (role: Message['role'], body: string) => {
+    if (selectedThreadId === null) return
+    setIsSending(true)
+    setThreadError(null)
+    try {
+      await postMessage(selectedThreadId, role, body)
+      await loadThread(selectedThreadId)
+      if (activeBotId !== null) {
+        const refreshedThreads = await listThreads(activeBotId)
+        setThreads((currentThreads) =>
+          refreshedThreads.map((thread) => ({
+            ...thread,
+            last_role: currentThreads.find((current) => current.id === thread.id)?.last_role,
+          })),
+        )
+      }
+      setFlashThreadId(selectedThreadId)
+      setPulseGenerate(true)
+    } catch {
+      setThreadError('Could not send the message. Please try again.')
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  const selectedThreadSummary =
+    threads.find((thread) => thread.id === selectedThreadId) ?? null
+
   return (
     <div className="app">
       <TopBar
@@ -112,71 +153,22 @@ export default function App() {
       />
 
       <div className="workspace">
-        {/* Left pane — thread list */}
-        <section className="pane pane-threads" data-active={activePane === 'chats'}>
-          <div className="pane-threads__header">
-            <h2 className="pane-threads__title">Chats</h2>
-            <input className="thread-search" type="text" placeholder="Search conversations" disabled />
-          </div>
-          <nav className="thread-list">
-            {THREADS.map((thread) => (
-              <div
-                key={thread.id}
-                className={`thread-row${thread.active ? ' active' : ''}${thread.justUpdated ? ' flash-row' : ''}`}
-              >
-                <div className="thread-avatar">{thread.name.charAt(0)}</div>
-                <div className="thread-main">
-                  <div className="thread-row__top">
-                    <p className="thread-name">{thread.name}</p>
-                    <span className="thread-time">{thread.time}</span>
-                  </div>
-                  <p className="thread-preview">{thread.preview}</p>
-                  <div className="thread-row__bottom">
-                    <span className={`chip ${thread.status}`}>
-                      {thread.status === 'escalated' ? 'Escalated' : 'Open'}
-                    </span>
-                    {thread.unread > 0 && <span className="unread-badge">{thread.unread}</span>}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </nav>
-        </section>
+        <ThreadList
+          threads={threads}
+          selectedThreadId={selectedThreadId}
+          latestDraft={selectedThread?.latest_draft ?? null}
+          flashThreadId={flashThreadId}
+          active={activePane === 'chats'}
+          onSelect={handleSelectThread}
+        />
 
-        {/* Center pane — active thread */}
-        <section className="pane pane-thread" data-active={activePane === 'thread'}>
-          <div className="thread-header">
-            <div className="thread-header__who">
-              <div className="thread-avatar">A</div>
-              <div className="thread-header__meta">
-                <p className="thread-header__name">Amara Chen</p>
-                <p className="thread-header__sub">+1 (415) 555-0138 · last seen 2m ago</p>
-              </div>
-            </div>
-            <div className="thread-header__actions">
-              <span className="chip escalated badge-in">Escalated</span>
-            </div>
-          </div>
-
-          <div className="chat-wallpaper">
-            <div className="message-list">
-              <span className="msg-day">Today</span>
-              {MESSAGES.map((message) => (
-                <div key={message.id} className={`bubble ${message.from}`}>
-                  <p className="bubble__text">{message.text}</p>
-                  <span className="bubble__time">{message.time}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="composer">
-            <input type="text" placeholder="Type a message… (wiring in Task 9)" disabled />
-            <button className="composer__send" type="button" disabled aria-label="Send">
-              ➤
-            </button>
-          </div>
-        </section>
+        <ChatPane
+          thread={selectedThread}
+          threadSummary={selectedThreadSummary}
+          isSending={isSending}
+          active={activePane === 'thread'}
+          onSend={handleSend}
+        />
 
         {/* Right pane — copilot draft panel */}
         <section className="pane pane-draft" data-active={activePane === 'draft'}>
@@ -219,7 +211,7 @@ export default function App() {
           </div>
 
           <div className="draft-actions">
-            <button className="btn-generate pulse-cta" type="button">
+            <button className={`btn-generate${pulseGenerate ? ' pulse-cta' : ''}`} type="button">
               ✦ Generate reply
             </button>
             <button className="btn-escalate" type="button">
@@ -228,6 +220,11 @@ export default function App() {
           </div>
         </section>
       </div>
+      {threadError && (
+        <p className="thread-error" role="alert">
+          {threadError}
+        </p>
+      )}
 
       <nav className="tabbar">
         {(['chats', 'thread', 'draft'] as Pane[]).map((pane) => (

@@ -362,11 +362,16 @@ button {
 
 .thread-row {
   position: relative;
+  width: 100%;
   display: flex;
   gap: 0.65rem;
   align-items: flex-start;
   padding: 0.7rem 1rem;
+  border: 0;
   cursor: pointer;
+  text-align: left;
+  color: inherit;
+  background: transparent;
   border-bottom: 1px solid rgba(17, 27, 33, 0.04);
   transition: background 0.15s ease;
 }
@@ -475,6 +480,36 @@ button {
 .chip.escalated {
   background: var(--danger-soft);
   color: var(--danger);
+}
+
+.chip.needs_draft {
+  background: #fff2d9;
+  color: #9a5b00;
+}
+
+.chip.replied {
+  background: #e8eef1;
+  color: var(--ink-soft);
+}
+
+.thread-list__empty,
+.chat-empty,
+.thread-error {
+  margin: 1rem;
+  color: var(--ink-soft);
+  font-size: 0.85rem;
+}
+
+.thread-error {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 30;
+  max-width: 20rem;
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.5rem;
+  color: var(--danger);
+  background: var(--danger-soft);
 }
 
 /* .flash-row — highlight a thread row that just received activity */
@@ -690,6 +725,33 @@ button {
 
 .composer__send:hover {
   filter: brightness(1.05);
+}
+
+.composer__send:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.role-toggle {
+  display: flex;
+  flex: none;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.role-toggle__option {
+  border: 0;
+  padding: 0.35rem 0.55rem;
+  color: var(--ink-soft);
+  background: transparent;
+  font: 700 0.68rem var(--font-ui);
+  cursor: pointer;
+}
+
+.role-toggle__option.active {
+  color: #fff;
+  background: var(--accent-deep);
 }
 
 /* ---- Right: copilot / draft panel --------------------------------- */
