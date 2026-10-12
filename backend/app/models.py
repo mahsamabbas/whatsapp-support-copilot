@@ -31,7 +31,7 @@ class StatusResponse(BaseModel):
 
 
 class ThreadCreate(BaseModel):
-    customer_name: str
+    customer_name: str = Field(min_length=1)
 
 
 class ThreadResponse(BaseModel):

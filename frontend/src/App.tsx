@@ -8,6 +8,7 @@ import { TopBar } from './components/TopBar'
 import {
   ApiError,
   approveDraft,
+  createThread,
   escalateThread,
   generateDraft,
   getThread,
@@ -215,6 +216,27 @@ export default function App() {
     setActivePane('thread')
   }
 
+  const handleCreateThread = async (customerName: string) => {
+    const botId = activeBotId
+    if (botId === null) return
+
+    setThreadError(null)
+    try {
+      const createdThread = await createThread(botId, customerName)
+      const refreshedThreads = await listThreads(botId)
+      setThreads((currentThreads) =>
+        refreshedThreads.map((thread) => ({
+          ...thread,
+          last_role: currentThreads.find((current) => current.id === thread.id)?.last_role,
+        })),
+      )
+      setSelectedThreadId(createdThread.id)
+      setActivePane('thread')
+    } catch (error) {
+      setThreadError(describeApiError(error))
+    }
+  }
+
   const handleSend = async (role: Message['role'], body: string) => {
     const threadId = selectedThreadId
     if (threadId === null) return
@@ -348,6 +370,7 @@ export default function App() {
           active={activePane === 'chats'}
           hasActiveBot={activeBotId !== null}
           onSelect={handleSelectThread}
+          onCreate={handleCreateThread}
         />
 
         <ChatPane

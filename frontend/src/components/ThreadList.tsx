@@ -13,6 +13,7 @@ interface ThreadListProps {
   active: boolean
   hasActiveBot: boolean
   onSelect: (threadId: number) => void
+  onCreate: (customerName: string) => void
 }
 
 const badgeLabels = {
@@ -37,11 +38,27 @@ export function ThreadList({
   active,
   hasActiveBot,
   onSelect,
+  onCreate,
 }: ThreadListProps) {
+  const handleCreate = () => {
+    const customerName = window.prompt('Customer name')
+    if (customerName?.trim()) onCreate(customerName.trim())
+  }
+
   return (
     <section className="pane pane-threads" data-active={active}>
       <div className="pane-threads__header">
-        <h2 className="pane-threads__title">Chats</h2>
+        <div className="pane-threads__heading">
+          <h2 className="pane-threads__title">Chats</h2>
+          <button
+            className="btn-new-chat"
+            type="button"
+            onClick={handleCreate}
+            disabled={!hasActiveBot}
+          >
+            + New chat
+          </button>
+        </div>
         <input className="thread-search" type="text" placeholder="Search conversations" disabled />
       </div>
       <nav className="thread-list" aria-label="Conversations">

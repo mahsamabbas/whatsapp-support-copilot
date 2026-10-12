@@ -15,6 +15,14 @@ def test_list_and_create_threads(client):
     assert created.json()["status"] == "open"
 
 
+def test_blank_customer_name_is_rejected(client):
+    bot_id = client.get("/bots").json()[0]["id"]
+
+    response = client.post(f"/bots/{bot_id}/threads", json={"customer_name": ""})
+
+    assert response.status_code == 422
+
+
 def test_thread_detail_includes_messages_and_latest_draft(client):
     bot_id = client.get("/bots").json()[0]["id"]
     thread_id = client.get(f"/bots/{bot_id}/threads").json()[0]["id"]

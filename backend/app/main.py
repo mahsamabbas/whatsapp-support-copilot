@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -47,6 +48,8 @@ from app.models import (
 )
 from app.ollama_clients import ollama_ok
 from app.validation import ValidationError, validate_knowledge_bytes
+
+logger = logging.getLogger(__name__)
 
 
 def _bot_or_404(bot_id: int):
@@ -109,8 +112,8 @@ async def lifespan(app: FastAPI):
         if texts:
             try:
                 index_store.build_for_bot(bot_id, texts)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to rebuild FAISS index for bot_id=%s: %s", bot_id, exc)
     yield
 
 

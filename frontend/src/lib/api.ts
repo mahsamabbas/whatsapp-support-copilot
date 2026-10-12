@@ -109,6 +109,8 @@ export const listBots = () => request<Bot[]>('/bots')
 export const createBot = (name: string) => request<Bot>('/bots', jsonRequest('POST', { name }))
 export const listKnowledge = (botId: number) => request<KnowledgeDocument[]>(`/bots/${botId}/knowledge`)
 export const listThreads = (botId: number) => request<Thread[]>(`/bots/${botId}/threads`)
+export const createThread = (botId: number, customerName: string) =>
+  request<Thread>(`/bots/${botId}/threads`, jsonRequest('POST', { customer_name: customerName }))
 export const getThread = (threadId: number) => request<ThreadDetail>(`/threads/${threadId}`)
 export const postMessage = (threadId: number, role: Message['role'], body: string) =>
   request<Message>(`/threads/${threadId}/messages`, jsonRequest('POST', { role, body }))
