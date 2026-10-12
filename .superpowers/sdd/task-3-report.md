@@ -1,6 +1,6 @@
 # Task 3 Report: Ollama clients and per-bot FAISS indexes
 
-**Status:** DONE  
+**Status:** DONE
 **Branch:** `feature/replydesk`
 
 ## Scope delivered
