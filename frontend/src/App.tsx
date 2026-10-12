@@ -1,4 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+
+import { BotModal } from './components/BotModal'
+import { TopBar } from './components/TopBar'
+import { listBots, type Bot } from './lib/api'
 
 type Pane = 'chats' | 'thread' | 'draft'
 
@@ -74,21 +78,38 @@ const MESSAGES: Message[] = [
 
 export default function App() {
   const [activePane, setActivePane] = useState<Pane>('thread')
+  const [bots, setBots] = useState<Bot[]>([])
+  const [activeBotId, setActiveBotId] = useState<number | null>(null)
+  const [isBotModalOpen, setIsBotModalOpen] = useState(false)
+
+  const loadBots = async () => {
+    try {
+      const nextBots = await listBots()
+      setBots(nextBots)
+      setActiveBotId((currentBotId) =>
+        currentBotId !== null && nextBots.some((bot) => bot.id === currentBotId)
+          ? currentBotId
+          : (nextBots[0]?.id ?? null),
+      )
+      if (nextBots.length === 0) setIsBotModalOpen(true)
+    } catch {
+      setBots([])
+      setActiveBotId(null)
+    }
+  }
+
+  useEffect(() => {
+    void loadBots()
+  }, [])
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="topbar__brand">
-          <h1 className="wordmark">
-            Reply<em>Desk</em>
-          </h1>
-          <span className="topbar__tagline">WhatsApp support, one pane ahead</span>
-        </div>
-        <div className="topbar__status">
-          <span className="status-dot" aria-hidden="true" />
-          Connected
-        </div>
-      </header>
+      <TopBar
+        bots={bots}
+        activeBotId={activeBotId}
+        onBotChange={setActiveBotId}
+        onCreateBot={() => setIsBotModalOpen(true)}
+      />
 
       <div className="workspace">
         {/* Left pane — thread list */}
@@ -220,6 +241,18 @@ export default function App() {
           </button>
         ))}
       </nav>
+
+      <BotModal
+        open={isBotModalOpen}
+        onClose={() => {
+          setIsBotModalOpen(false)
+          void loadBots()
+        }}
+        onBotCreated={(bot) => {
+          setBots((currentBots) => [...currentBots, bot])
+          setActiveBotId(bot.id)
+        }}
+      />
     </div>
   )
 }
