@@ -8,6 +8,8 @@ from app.config import CORS_ORIGINS
 from app.db import (
     add_message,
     add_knowledge,
+    approve_draft,
+    create_escalation,
     create_thread,
     create_bot,
     delete_knowledge,
@@ -17,16 +19,24 @@ from app.db import (
     get_thread,
     init_db,
     list_bots,
+    list_escalations,
     list_knowledge,
     list_messages,
     list_threads,
     seed_if_empty,
+    set_thread_status,
+    upsert_draft,
 )
+from app.draft_service import NoCustomerMessageError, NoIndexError, generate_draft
 from app.index_store import IndexStore
 from app.models import (
+    ApproveRequest,
     BotCreate,
     BotResponse,
     DraftResponse,
+    DraftResultResponse,
+    EscalateRequest,
+    EscalationResponse,
     KnowledgeDocumentResponse,
     MessageCreate,
     MessageResponse,
@@ -52,6 +62,22 @@ def _bot_or_404(bot_id: int):
 
 def _model(model_type, row):
     return model_type.model_validate(dict(row))
+
+
+def _thread_detail(conn, thread_id: int) -> ThreadDetailResponse:
+    thread = get_thread(conn, thread_id)
+    return ThreadDetailResponse(
+        **_model(ThreadResponse, thread).model_dump(),
+        messages=[
+            _model(MessageResponse, message)
+            for message in list_messages(conn, thread_id)
+        ],
+        latest_draft=(
+            _model(DraftResponse, draft)
+            if (draft := get_latest_draft(conn, thread_id)) is not None
+            else None
+        ),
+    )
 
 
 def _build_index_for_bot(index_store: IndexStore, bot_id: int) -> None:
@@ -170,21 +196,9 @@ def create_thread_route(bot_id: int, payload: ThreadCreate) -> ThreadResponse:
 def thread_detail(thread_id: int) -> ThreadDetailResponse:
     conn = get_connection()
     try:
-        thread = get_thread(conn, thread_id)
-        if thread is None:
+        if get_thread(conn, thread_id) is None:
             raise HTTPException(status_code=404, detail="Thread not found.")
-        return ThreadDetailResponse(
-            **_model(ThreadResponse, thread).model_dump(),
-            messages=[
-                _model(MessageResponse, message)
-                for message in list_messages(conn, thread_id)
-            ],
-            latest_draft=(
-                _model(DraftResponse, draft)
-                if (draft := get_latest_draft(conn, thread_id)) is not None
-                else None
-            ),
-        )
+        return _thread_detail(conn, thread_id)
     finally:
         conn.close()
 
@@ -245,3 +259,95 @@ async def upload_knowledge(
             status_code=503, detail="Knowledge index is temporarily unavailable."
         ) from exc
     return _model(KnowledgeDocumentResponse, document)
+
+
+@app.post("/threads/{thread_id}/draft", response_model=DraftResultResponse)
+def create_draft_route(thread_id: int, request: Request) -> DraftResultResponse:
+    conn = get_connection()
+    try:
+        thread = get_thread(conn, thread_id)
+        if thread is None:
+            raise HTTPException(status_code=404, detail="Thread not found.")
+        try:
+            result = generate_draft(
+                conn, request.app.state.index_store, thread["bot_id"], thread_id
+            )
+        except NoIndexError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except NoCustomerMessageError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return DraftResultResponse(
+            body=result.body,
+            confidence=result.confidence,
+            sources=result.sources,
+            escalated=result.escalated,
+            reason=result.reason,
+            draft_id=result.draft_id,
+        )
+    finally:
+        conn.close()
+
+
+@app.post("/threads/{thread_id}/approve", response_model=ThreadDetailResponse)
+def approve_draft_route(
+    thread_id: int, payload: ApproveRequest | None = None
+) -> ThreadDetailResponse:
+    conn = get_connection()
+    try:
+        if get_thread(conn, thread_id) is None:
+            raise HTTPException(status_code=404, detail="Thread not found.")
+
+        draft = get_latest_draft(conn, thread_id)
+        override_body = (payload.body if payload else None) or ""
+        body = override_body.strip() or (draft["body"] if draft else "")
+        if not body:
+            raise HTTPException(status_code=400, detail="No draft body to approve.")
+
+        add_message(conn, thread_id, "agent", body)
+        if draft is not None:
+            approve_draft(conn, draft["id"])
+        set_thread_status(conn, thread_id, "resolved")
+        return _thread_detail(conn, thread_id)
+    finally:
+        conn.close()
+
+
+@app.post("/threads/{thread_id}/escalate", response_model=ThreadDetailResponse)
+def escalate_thread_route(
+    thread_id: int, payload: EscalateRequest | None = None
+) -> ThreadDetailResponse:
+    conn = get_connection()
+    try:
+        if get_thread(conn, thread_id) is None:
+            raise HTTPException(status_code=404, detail="Thread not found.")
+
+        reason = (payload.reason if payload else None) or "Escalated by agent."
+        create_escalation(conn, thread_id, reason)
+        set_thread_status(conn, thread_id, "escalated")
+
+        draft = get_latest_draft(conn, thread_id)
+        if draft is not None and draft["state"] == "pending":
+            upsert_draft(
+                conn,
+                thread_id,
+                draft["body"],
+                draft["confidence"],
+                draft["sources_json"],
+                state="escalated",
+            )
+        return _thread_detail(conn, thread_id)
+    finally:
+        conn.close()
+
+
+@app.get("/bots/{bot_id}/escalations", response_model=list[EscalationResponse])
+def escalations_route(bot_id: int) -> list[EscalationResponse]:
+    _bot_or_404(bot_id)
+    conn = get_connection()
+    try:
+        return [
+            _model(EscalationResponse, escalation)
+            for escalation in list_escalations(conn, bot_id)
+        ]
+    finally:
+        conn.close()

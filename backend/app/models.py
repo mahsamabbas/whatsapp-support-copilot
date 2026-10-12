@@ -75,3 +75,30 @@ class DraftResponse(BaseModel):
 class ThreadDetailResponse(ThreadResponse):
     messages: list[MessageResponse]
     latest_draft: DraftResponse | None
+
+
+class DraftResultResponse(BaseModel):
+    body: str
+    confidence: float
+    sources: list[str]
+    escalated: bool
+    reason: str | None
+    draft_id: int
+
+
+class ApproveRequest(BaseModel):
+    body: str | None = None
+
+
+class EscalateRequest(BaseModel):
+    reason: str | None = None
+
+
+class EscalationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    thread_id: int
+    reason: str
+    status: str
+    created_at: str
