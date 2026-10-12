@@ -18,3 +18,13 @@
 
 - Vite emits a non-blocking warning because the local Node `22.11.0` is below its stated `22.12.0` minimum.
 - List endpoints do not return `last_role`; it is deliberately derived from `getThread` when the user selects a thread, without changing the backend API.
+
+## Task 9 review fix (race + flash)
+
+- `loadThread` skips `setSelectedThread` / thread list updates when the effect cleanup sets `cancelled`, avoiding stale thread detail after rapid thread switches.
+- `flashThreadId` clears after ~1.2s so the row flash animation can run again on subsequent sends.
+- `pulseGenerate` left for Task 10 (DraftPanel ownership); vitest re-run recorded below.
+
+### Post-fix verification
+
+- `cd frontend && npx vitest run` — 1 file, 6 tests passed.

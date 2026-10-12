@@ -83,8 +83,9 @@ export default function App() {
     }
   }, [activeBotId])
 
-  const loadThread = async (threadId: number) => {
+  const loadThread = async (threadId: number, isStale: () => boolean = () => false) => {
     const detail = await getThread(threadId)
+    if (isStale()) return detail
     const lastRole = detail.messages.at(-1)?.role
     setSelectedThread(detail)
     setThreads((currentThreads) =>
@@ -97,9 +98,10 @@ export default function App() {
 
   useEffect(() => {
     if (selectedThreadId === null) return
+    const threadId = selectedThreadId
     let cancelled = false
     setThreadError(null)
-    void loadThread(selectedThreadId).catch(() => {
+    void loadThread(threadId, () => cancelled).catch(() => {
       if (!cancelled) {
         setSelectedThread(null)
         setThreadError('Could not load this conversation.')
@@ -109,6 +111,12 @@ export default function App() {
       cancelled = true
     }
   }, [selectedThreadId])
+
+  useEffect(() => {
+    if (flashThreadId === null) return
+    const timer = window.setTimeout(() => setFlashThreadId(null), 1200)
+    return () => window.clearTimeout(timer)
+  }, [flashThreadId])
 
   const handleSelectThread = (threadId: number) => {
     setSelectedThreadId(threadId)
