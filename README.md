@@ -11,7 +11,7 @@ Drafts only — **no real WhatsApp**, Twilio, or automatic external sending. The
 - Multi-bot switcher + create bot + per-bot `.txt` / `.md` knowledge upload
 - **Knowledge** modal — list uploaded files and preview full contents
 - WhatsApp-inspired three-pane desk: conversation list · chat · AI draft copilot
-- Seeded **Demo Shop Support** bot with sample policy and threads
+- Fresh start: create your own bots (no demo bot is seeded)
 - Act as **Customer** or **Agent**; **+ New chat** for new conversations
 - Grounded drafts with confidence + source excerpts
 - **Auto-send** after a successful grounded generate (edit + “Send edited reply” still available)
@@ -147,14 +147,21 @@ npm ci
 VITE_API_BASE=http://localhost:8003 npm run dev -- --port 3003
 ```
 
-On first API start, SQLite seeds **Demo Shop Support** + sample policy + sample threads.
+On first API start the database is empty — create a bot and upload knowledge yourself.
 
 ## Multi-bot demo
 
-1. Select **Demo Shop Support** → open a customer thread (e.g. returns question).
-2. **Generate** (or send a customer message) → grounded reply **auto-sends** into the thread; open the off-topic thread to see auto-escalate instead.
-3. **Create bot** → upload your own `.txt`/`.md` policy (200–12,000 chars, UTF-8).
-4. **+ New chat** → Act as **Customer** → message → Generate. Knowledge stays isolated per bot.
+1. **Create bot** → upload a UTF-8 `.txt`/`.md` policy (200–12,000 chars).
+2. **+ New chat** → Act as **Customer** → send a question covered by your policy.
+3. **Generate** → grounded reply **auto-sends** into the thread; ask something off-policy to see auto-escalate.
+4. Create a second bot with different docs — knowledge stays isolated per bot.
+
+To wipe local demo data and start clean:
+
+```bash
+rm -f backend/data/replydesk.db
+docker compose up --build
+```
 
 ## Environment variables
 

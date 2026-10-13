@@ -32,5 +32,13 @@ def client(tmp_path, monkeypatch):
         lambda: IndexStore(embeddings_factory=lambda: FakeEmbeddings()),
     )
 
+    # Tests still use the demo seed; production lifespan no longer seeds.
+    conn = db.get_connection()
+    try:
+        db.init_db(conn)
+        db.seed_if_empty(conn)
+    finally:
+        conn.close()
+
     with TestClient(main.app) as test_client:
         yield test_client

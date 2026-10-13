@@ -24,7 +24,6 @@ from app.db import (
     list_knowledge,
     list_messages,
     list_threads,
-    seed_if_empty,
     set_draft_state,
     set_thread_status,
 )
@@ -97,7 +96,7 @@ async def lifespan(app: FastAPI):
     conn = get_connection()
     try:
         init_db(conn)
-        seed_if_empty(conn)
+        # No demo seed — operators create bots and upload knowledge themselves.
         bots = list_bots(conn)
         documents_by_bot = {
             bot["id"]: [doc["content_text"] for doc in list_knowledge(conn, bot["id"])]
