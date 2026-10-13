@@ -468,13 +468,43 @@ textarea:focus-visible {
 }
 
 .bot-modal__form input[type='text'],
-.bot-modal__form input[type='file'] {
+.bot-modal__form input[type='file'],
+.prompt-modal__textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 0.5rem;
   padding: 0.65rem;
   color: var(--ink);
   font: 500 0.88rem var(--font-ui);
+  background: var(--surface);
+}
+
+.prompt-modal {
+  position: relative;
+  width: min(100%, 28rem);
+  border-radius: 0.9rem;
+  padding: 1.5rem;
+  background: var(--surface);
+  box-shadow: 0 16px 42px rgba(17, 27, 33, 0.25);
+}
+
+.prompt-modal h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+}
+
+.prompt-modal__textarea {
+  resize: vertical;
+  min-height: 6.5rem;
+  line-height: 1.45;
+}
+
+.prompt-modal__textarea:focus,
+.bot-modal__form input[type='text']:focus {
+  outline: none;
+  border-color: rgba(37, 211, 102, 0.7);
+  box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .form-error {

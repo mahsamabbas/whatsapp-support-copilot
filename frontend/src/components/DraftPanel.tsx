@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import { PromptModal } from './PromptModal'
 import type { ThreadDetail } from '../lib/api'
 
 export interface DraftView {
@@ -39,6 +40,7 @@ export function DraftPanel({
   onEscalate,
 }: DraftPanelProps) {
   const [body, setBody] = useState(draft?.body ?? '')
+  const [isEscalateOpen, setIsEscalateOpen] = useState(false)
 
   // Reset the editable textarea whenever a new draft arrives, without
   // clobbering in-progress edits on re-renders of the same draft.
@@ -67,12 +69,6 @@ export function DraftPanel({
   const confidencePct = draft ? Math.round(draft.confidence * 100) : 0
   const canApprove = hasDraft && body.trim().length > 0 && !busy
   const showEditor = hasDraft && (!draft.escalated || draft.body.length > 0)
-
-  const handleEscalateClick = () => {
-    const input = window.prompt('Reason for escalating (optional):', '')
-    if (input === null) return
-    onEscalate(input.trim() || undefined)
-  }
 
   return (
     <section className="pane pane-draft" data-active={active}>
@@ -180,11 +176,27 @@ export function DraftPanel({
           className="btn-escalate"
           type="button"
           disabled={busy}
-          onClick={handleEscalateClick}
+          onClick={() => setIsEscalateOpen(true)}
         >
           {isEscalating ? 'Escalating…' : 'Escalate to human'}
         </button>
       </div>
+
+      <PromptModal
+        open={isEscalateOpen}
+        title="Escalate to a human"
+        description="Mark this conversation for human follow-up. A reason helps the next agent."
+        label="Reason (optional)"
+        placeholder="e.g. Customer asking for a refund outside policy"
+        submitLabel="Escalate"
+        cancelLabel="Keep drafting"
+        multiline
+        onClose={() => setIsEscalateOpen(false)}
+        onSubmit={(reason) => {
+          setIsEscalateOpen(false)
+          onEscalate(reason || undefined)
+        }}
+      />
     </section>
   )
 }

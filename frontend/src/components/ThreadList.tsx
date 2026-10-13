@@ -1,3 +1,6 @@
+import { useState } from 'react'
+
+import { PromptModal } from './PromptModal'
 import { threadBadge } from '../lib/badges'
 import type { Draft, Thread } from '../lib/api'
 
@@ -40,10 +43,7 @@ export function ThreadList({
   onSelect,
   onCreate,
 }: ThreadListProps) {
-  const handleCreate = () => {
-    const customerName = window.prompt('Customer name')
-    if (customerName?.trim()) onCreate(customerName.trim())
-  }
+  const [isNewChatOpen, setIsNewChatOpen] = useState(false)
 
   return (
     <section className="pane pane-threads" data-active={active}>
@@ -53,7 +53,7 @@ export function ThreadList({
           <button
             className="btn-new-chat"
             type="button"
-            onClick={handleCreate}
+            onClick={() => setIsNewChatOpen(true)}
             disabled={!hasActiveBot}
           >
             + New chat
@@ -98,6 +98,21 @@ export function ThreadList({
           </p>
         )}
       </nav>
+
+      <PromptModal
+        open={isNewChatOpen}
+        title="New conversation"
+        description="Start a simulated customer thread for this bot."
+        label="Customer name"
+        placeholder="e.g. Aisha Khan"
+        submitLabel="Create chat"
+        required
+        onClose={() => setIsNewChatOpen(false)}
+        onSubmit={(customerName) => {
+          setIsNewChatOpen(false)
+          onCreate(customerName)
+        }}
+      />
     </section>
   )
 }
