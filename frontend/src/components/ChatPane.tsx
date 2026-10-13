@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { threadBadge } from '../lib/badges'
 import type { Message, ThreadDetail } from '../lib/api'
@@ -30,6 +30,14 @@ export function ChatPane({ thread, threadSummary, isSending, active, onSend }: C
   const [role, setRole] = useState<Message['role']>('customer')
   const [body, setBody] = useState('')
 
+  const isEscalated = thread?.status === 'escalated'
+
+  useEffect(() => {
+    // Once escalated, human agent owns replies in this composer.
+    if (isEscalated) setRole('agent')
+    else setRole('customer')
+  }, [isEscalated, thread?.id])
+
   if (!thread || !threadSummary) {
     return (
       <section className="pane pane-thread" data-active={active}>
@@ -39,7 +47,11 @@ export function ChatPane({ thread, threadSummary, isSending, active, onSend }: C
   }
 
   const badge = threadBadge(threadSummary, thread.latest_draft)
-  const canSend = role === 'customer' && body.trim().length > 0 && !isSending
+  const agentAllowed = isEscalated
+  const canSend =
+    body.trim().length > 0 &&
+    !isSending &&
+    (role === 'customer' || (role === 'agent' && agentAllowed))
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -55,7 +67,9 @@ export function ChatPane({ thread, threadSummary, isSending, active, onSend }: C
           <div className="thread-avatar">{thread.customer_name.charAt(0)}</div>
           <div className="thread-header__meta">
             <p className="thread-header__name">{thread.customer_name}</p>
-            <p className="thread-header__sub">WhatsApp conversation</p>
+            <p className="thread-header__sub">
+              {isEscalated ? 'Waiting for human agent' : 'WhatsApp conversation'}
+            </p>
           </div>
         </div>
         <div className="thread-header__actions">
@@ -77,22 +91,37 @@ export function ChatPane({ thread, threadSummary, isSending, active, onSend }: C
 
       <form className="composer" onSubmit={handleSubmit}>
         <div className="role-toggle" aria-label="Message sender">
-          {(['customer', 'agent'] as const).map((option) => (
-            <button
-              key={option}
-              className={`role-toggle__option${role === option ? ' active' : ''}`}
-              type="button"
-              onClick={() => setRole(option)}
-            >
-              {option === 'customer' ? 'Customer' : 'Agent'}
-            </button>
-          ))}
+          {(['customer', 'agent'] as const).map((option) => {
+            const agentDisabled = option === 'agent' && !agentAllowed
+            return (
+              <button
+                key={option}
+                className={`role-toggle__option${role === option ? ' active' : ''}`}
+                type="button"
+                disabled={agentDisabled}
+                title={
+                  agentDisabled
+                    ? 'Agent typing unlocks after the case is escalated'
+                    : undefined
+                }
+                onClick={() => setRole(option)}
+              >
+                {option === 'customer' ? 'Customer' : 'Agent'}
+              </button>
+            )
+          })}
         </div>
         <input
           type="text"
           value={body}
-          placeholder={role === 'customer' ? 'Type a customer message…' : 'Agent messages are disabled'}
-          disabled={role !== 'customer' || isSending}
+          placeholder={
+            role === 'customer'
+              ? 'Type a customer message…'
+              : agentAllowed
+                ? 'Type a human agent reply…'
+                : 'Agent replies use Copilot until escalated'
+          }
+          disabled={(role === 'agent' && !agentAllowed) || isSending}
           onChange={(event) => setBody(event.target.value)}
         />
         <button className="composer__send" type="submit" disabled={!canSend} aria-label="Send">

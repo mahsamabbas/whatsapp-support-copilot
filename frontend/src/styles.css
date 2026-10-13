@@ -1286,6 +1286,13 @@ textarea:focus-visible {
   color: var(--ink);
 }
 
+.draft-reason__hint {
+  margin: 0.55rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--ink-soft);
+}
+
 .source-list {
   margin: 0.4rem 0 0;
   padding: 0;

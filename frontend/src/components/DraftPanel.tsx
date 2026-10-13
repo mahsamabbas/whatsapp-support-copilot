@@ -64,18 +64,22 @@ export function DraftPanel({
     )
   }
 
+  const isEscalated = thread.status === 'escalated' || Boolean(draft?.escalated)
   const busy = isGenerating || isApproving || isEscalating
   const hasDraft = draft !== null
   const confidencePct = draft ? Math.round(draft.confidence * 100) : 0
-  const canApprove = hasDraft && body.trim().length > 0 && !busy
-  const showEditor = hasDraft && (!draft.escalated || draft.body.length > 0)
+  const canApprove = !isEscalated && hasDraft && body.trim().length > 0 && !busy
+  const showEditor = !isEscalated && hasDraft && draft.body.length > 0
+  const copilotPaused = isEscalated
 
   return (
     <section className="pane pane-draft" data-active={active}>
       <div className="draft-header">
         <h2 className="draft-title">Copilot</h2>
         <p className="draft-sub">
-          Grounded replies auto-send; unclear ones escalate for a human
+          {copilotPaused
+            ? 'AI paused — reply as Agent in the chat while a human owns this case'
+            : 'Grounded replies auto-send; unclear ones escalate for a human'}
         </p>
       </div>
 
@@ -97,11 +101,16 @@ export function DraftPanel({
           </div>
         )}
 
-        {!isGenerating && draft?.escalated && (
+        {!isGenerating && isEscalated && (
           <div className="draft-reason badge-in">
             <p className="draft-reason__label">Escalated to a human</p>
             <p className="draft-reason__text">
-              {draft.reason ?? 'This conversation needs a person to take over.'}
+              {draft?.reason ?? 'This conversation needs a person to take over.'}
+            </p>
+            <p className="draft-reason__hint">
+              The customer was notified in chat. New customer messages stay in the
+              thread for the human agent — Copilot will not auto-reply until the
+              case is no longer escalated.
             </p>
           </div>
         )}
@@ -144,7 +153,7 @@ export function DraftPanel({
           </>
         )}
 
-        {!isGenerating && !hasDraft && !error && (
+        {!isGenerating && !isEscalated && !hasDraft && !error && (
           <div className="draft-empty">
             {thread.status === 'resolved'
               ? 'Reply sent. A new draft will appear after the next customer message.'
@@ -155,10 +164,11 @@ export function DraftPanel({
 
       <div className="draft-actions">
         <button
-          className={`btn-generate${pulseGenerate && !busy ? ' pulse-cta' : ''}`}
+          className={`btn-generate${pulseGenerate && !busy && !copilotPaused ? ' pulse-cta' : ''}`}
           type="button"
-          disabled={busy}
+          disabled={busy || copilotPaused}
           onClick={onGenerate}
+          title={copilotPaused ? 'AI is paused while this case is escalated' : undefined}
         >
           {isGenerating ? 'Generating…' : hasDraft ? '↻ Regenerate' : '✦ Generate reply'}
         </button>
@@ -175,8 +185,9 @@ export function DraftPanel({
         <button
           className="btn-escalate"
           type="button"
-          disabled={busy}
+          disabled={busy || copilotPaused}
           onClick={() => setIsEscalateOpen(true)}
+          title={copilotPaused ? 'Already escalated to a human' : undefined}
         >
           {isEscalating ? 'Escalating…' : 'Escalate to human'}
         </button>
@@ -185,7 +196,7 @@ export function DraftPanel({
       <PromptModal
         open={isEscalateOpen}
         title="Escalate to a human"
-        description="Mark this conversation for human follow-up. A reason helps the next agent."
+        description="Mark this conversation for human follow-up. The customer will see a notice in chat."
         label="Reason (optional)"
         placeholder="e.g. Customer asking for a refund outside policy"
         submitLabel="Escalate"

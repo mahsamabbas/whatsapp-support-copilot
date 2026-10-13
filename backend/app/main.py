@@ -5,7 +5,7 @@ from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.config import CORS_ORIGINS
+from app.config import CORS_ORIGINS, ESCALATION_CUSTOMER_NOTICE
 from app.db import (
     add_message,
     add_knowledge,
@@ -326,6 +326,7 @@ def escalate_thread_route(
         reason = (payload.reason if payload else None) or "Escalated by agent."
         create_escalation(conn, thread_id, reason)
         set_thread_status(conn, thread_id, "escalated")
+        add_message(conn, thread_id, "agent", ESCALATION_CUSTOMER_NOTICE)
 
         draft = get_latest_draft(conn, thread_id)
         if draft is not None:

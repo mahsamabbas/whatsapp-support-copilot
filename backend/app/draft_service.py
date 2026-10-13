@@ -4,8 +4,18 @@ import json
 import sqlite3
 from dataclasses import dataclass
 
-from app.config import ESCALATION_REASON_LOW_CONFIDENCE, SIMILARITY_CUTOFF
-from app.db import create_escalation, list_messages, set_thread_status, upsert_draft
+from app.config import (
+    ESCALATION_CUSTOMER_NOTICE,
+    ESCALATION_REASON_LOW_CONFIDENCE,
+    SIMILARITY_CUTOFF,
+)
+from app.db import (
+    add_message,
+    create_escalation,
+    list_messages,
+    set_thread_status,
+    upsert_draft,
+)
 from app.ollama_clients import get_chat
 
 SYSTEM_PROMPT = (
@@ -76,6 +86,7 @@ def generate_draft(conn: sqlite3.Connection, store, bot_id: int, thread_id: int)
         )
         create_escalation(conn, thread_id, ESCALATION_REASON_LOW_CONFIDENCE)
         set_thread_status(conn, thread_id, "escalated")
+        add_message(conn, thread_id, "agent", ESCALATION_CUSTOMER_NOTICE)
         return DraftResult(
             body="",
             confidence=confidence,

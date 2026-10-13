@@ -52,6 +52,11 @@ def test_low_confidence_escalates_without_inventing(client, monkeypatch):
     assert data["reason"]
     chat.invoke.assert_not_called()
     assert "World Cup" not in (data.get("body") or "")
+    detail = client.get(f"/threads/{tid}").json()
+    assert any(
+        m["role"] == "agent" and "escalated to a human agent" in m["body"].lower()
+        for m in detail["messages"]
+    )
 
 
 def test_approve_writes_agent_message(client, monkeypatch):
@@ -151,6 +156,10 @@ def test_manual_escalate_sets_status_and_creates_escalation(client, monkeypatch)
 
     detail = client.get(f"/threads/{tid}").json()
     assert detail["status"] == "escalated"
+    assert any(
+        m["role"] == "agent" and "escalated to a human agent" in m["body"].lower()
+        for m in detail["messages"]
+    )
 
     escalations = client.get(f"/bots/{bot_id}/escalations").json()
     assert any(e["thread_id"] == tid and e["reason"] == "Angry customer" for e in escalations)

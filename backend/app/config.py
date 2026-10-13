@@ -19,6 +19,10 @@ OLLAMA_EMBED_MODEL = os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
 ESCALATION_REASON_LOW_CONFIDENCE = (
     "Not enough matching policy content to draft a safe reply."
 )
+ESCALATION_CUSTOMER_NOTICE = (
+    "Your case has been escalated to a human agent. "
+    "Someone from our team will follow up shortly."
+)
 CORS_ORIGINS = [
     o.strip()
     for o in os.getenv(

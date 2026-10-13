@@ -259,14 +259,19 @@ export default function App() {
     setThreadError(null)
     try {
       await postMessage(threadId, role, body)
-      await loadThread(threadId, isStale)
+      const detail = await loadThread(threadId, isStale)
       if (isStale()) return
       await refreshThreadsList()
       setFlashThreadId(threadId)
       if (role === 'customer') {
         setDraftError(null)
-        setDraftView(null)
-        setPulseGenerate(true)
+        // Escalated cases stay with the human — do not auto-draft again.
+        if (detail?.status === 'escalated') {
+          setPulseGenerate(false)
+        } else {
+          setDraftView(null)
+          setPulseGenerate(true)
+        }
       }
     } catch {
       if (!isStale()) setThreadError('Could not send the message. Please try again.')
