@@ -137,16 +137,37 @@ textarea:focus-visible {
 }
 
 .bot-selector {
-  max-width: 12rem;
-  min-width: 0;
+  max-width: 13.5rem;
+  min-width: 8.5rem;
+  appearance: none;
+  -webkit-appearance: none;
   border: 1px solid var(--line);
   border-radius: 0.5rem;
-  padding: 0.4rem 1.7rem 0.4rem 0.6rem;
+  padding: 0.45rem 2.35rem 0.45rem 0.75rem;
   color: var(--ink);
-  background: var(--surface);
+  background-color: var(--surface);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1.5 1.75L6 6.25L10.5 1.75' stroke='%23566733' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 0.75rem 0.5rem;
   font: 600 0.78rem var(--font-ui);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.bot-selector:hover {
+  border-color: rgba(37, 211, 102, 0.45);
+}
+
+.bot-selector:focus {
+  outline: none;
+  border-color: rgba(37, 211, 102, 0.7);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.bot-selector:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .knowledge-pill {
