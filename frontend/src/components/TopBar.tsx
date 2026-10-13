@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 
 import { listKnowledge, type Bot } from '../lib/api'
 
@@ -19,8 +19,14 @@ export function TopBar({
   onCreateBot,
   onViewKnowledge,
 }: TopBarProps) {
+  const listId = useId()
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const [hasKnowledge, setHasKnowledge] = useState<boolean | null>(null)
   const [docCount, setDocCount] = useState(0)
+  const [isBotMenuOpen, setIsBotMenuOpen] = useState(false)
+
+  const activeBot = bots.find((bot) => bot.id === activeBotId) ?? null
+  const triggerLabel = activeBot?.name ?? (bots.length === 0 ? 'No bots yet' : 'Select a bot')
 
   useEffect(() => {
     if (activeBotId === null) {
@@ -48,6 +54,30 @@ export function TopBar({
     }
   }, [activeBotId, bots, knowledgeRevision])
 
+  useEffect(() => {
+    if (!isBotMenuOpen) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!dropdownRef.current?.contains(event.target as Node)) {
+        setIsBotMenuOpen(false)
+      }
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsBotMenuOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isBotMenuOpen])
+
+  useEffect(() => {
+    setIsBotMenuOpen(false)
+  }, [activeBotId, bots.length])
+
   const knowledgeLabel =
     hasKnowledge === true
       ? docCount === 1
@@ -65,26 +95,47 @@ export function TopBar({
       </div>
 
       <div className="topbar__controls">
-        <label className="sr-only" htmlFor="bot-selector">
-          Active bot
-        </label>
-        <select
-          id="bot-selector"
-          className="bot-selector"
-          value={activeBotId ?? ''}
-          onChange={(event) => onBotChange(Number(event.target.value))}
-          disabled={bots.length === 0}
-        >
-          {bots.length === 0 ? (
-            <option value="">No bots yet</option>
-          ) : (
-            bots.map((bot) => (
-              <option key={bot.id} value={bot.id}>
-                {bot.name}
-              </option>
-            ))
+        <div className="bot-dropdown" ref={dropdownRef}>
+          <button
+            id="bot-selector"
+            type="button"
+            className={`bot-dropdown__trigger${isBotMenuOpen ? ' open' : ''}`}
+            aria-haspopup="listbox"
+            aria-expanded={isBotMenuOpen}
+            aria-controls={listId}
+            disabled={bots.length === 0}
+            onClick={() => setIsBotMenuOpen((open) => !open)}
+          >
+            <span className="bot-dropdown__label">{triggerLabel}</span>
+            <span className="bot-dropdown__chevron" aria-hidden="true" />
+          </button>
+
+          {isBotMenuOpen && bots.length > 0 && (
+            <ul id={listId} className="bot-dropdown__menu" role="listbox" aria-label="Active bot">
+              {bots.map((bot) => {
+                const selected = bot.id === activeBotId
+                return (
+                  <li key={bot.id} role="presentation">
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={selected}
+                      className={`bot-dropdown__option${selected ? ' selected' : ''}`}
+                      onClick={() => {
+                        onBotChange(bot.id)
+                        setIsBotMenuOpen(false)
+                      }}
+                    >
+                      <span className="bot-dropdown__option-name">{bot.name}</span>
+                      {selected && <span className="bot-dropdown__check" aria-hidden="true" />}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
           )}
-        </select>
+        </div>
+
         {hasKnowledge !== null && (
           <button
             type="button"
