@@ -5,16 +5,27 @@ import { listKnowledge, type Bot } from '../lib/api'
 interface TopBarProps {
   bots: Bot[]
   activeBotId: number | null
+  knowledgeRevision: number
   onBotChange: (botId: number) => void
   onCreateBot: () => void
+  onViewKnowledge: () => void
 }
 
-export function TopBar({ bots, activeBotId, onBotChange, onCreateBot }: TopBarProps) {
+export function TopBar({
+  bots,
+  activeBotId,
+  knowledgeRevision,
+  onBotChange,
+  onCreateBot,
+  onViewKnowledge,
+}: TopBarProps) {
   const [hasKnowledge, setHasKnowledge] = useState<boolean | null>(null)
+  const [docCount, setDocCount] = useState(0)
 
   useEffect(() => {
     if (activeBotId === null) {
       setHasKnowledge(null)
+      setDocCount(0)
       return
     }
 
@@ -22,18 +33,27 @@ export function TopBar({ bots, activeBotId, onBotChange, onCreateBot }: TopBarPr
     setHasKnowledge(null)
     void listKnowledge(activeBotId)
       .then((documents) => {
-        if (!cancelled) setHasKnowledge(documents.length > 0)
+        if (cancelled) return
+        setHasKnowledge(documents.length > 0)
+        setDocCount(documents.length)
       })
       .catch(() => {
-        if (!cancelled) setHasKnowledge(false)
+        if (cancelled) return
+        setHasKnowledge(false)
+        setDocCount(0)
       })
 
     return () => {
       cancelled = true
     }
-  }, [activeBotId, bots])
+  }, [activeBotId, bots, knowledgeRevision])
 
-  const knowledgeLabel = hasKnowledge === true ? 'Ready' : 'Needs docs'
+  const knowledgeLabel =
+    hasKnowledge === true
+      ? docCount === 1
+        ? '1 file · Ready'
+        : `${docCount} files · Ready`
+      : 'Needs docs'
 
   return (
     <header className="topbar">
@@ -66,8 +86,24 @@ export function TopBar({ bots, activeBotId, onBotChange, onCreateBot }: TopBarPr
           )}
         </select>
         {hasKnowledge !== null && (
-          <span className={`knowledge-pill${hasKnowledge ? ' ready' : ''}`}>{knowledgeLabel}</span>
+          <button
+            type="button"
+            className={`knowledge-pill${hasKnowledge ? ' ready' : ''}${activeBotId === null ? '' : ' clickable'}`}
+            onClick={onViewKnowledge}
+            disabled={activeBotId === null}
+            title="View knowledge files"
+          >
+            {knowledgeLabel}
+          </button>
         )}
+        <button
+          className="btn-secondary btn-knowledge"
+          type="button"
+          onClick={onViewKnowledge}
+          disabled={activeBotId === null}
+        >
+          Knowledge
+        </button>
         <button className="btn-create-bot" type="button" onClick={onCreateBot}>
           Create bot
         </button>

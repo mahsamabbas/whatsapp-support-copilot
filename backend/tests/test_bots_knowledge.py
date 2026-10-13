@@ -44,7 +44,9 @@ def test_upload_rebuilds_index_and_lists_document(client):
 
     documents = client.get(f"/bots/{bot_id}/knowledge")
     assert documents.status_code == 200
-    assert [doc["filename"] for doc in documents.json()] == ["policy.md"]
+    docs = documents.json()
+    assert [doc["filename"] for doc in docs] == ["policy.md"]
+    assert "Shipping takes 3 to 5 business days" in docs[0]["content_text"]
     assert client.app.state.index_store.has_index(bot_id)
 
 

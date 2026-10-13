@@ -16,6 +16,7 @@ export interface KnowledgeDocument {
   id: number
   bot_id: number
   filename: string
+  content_text: string
   created_at: string
 }
 

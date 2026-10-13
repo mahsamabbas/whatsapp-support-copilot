@@ -9,6 +9,7 @@ Drafts only — **no real WhatsApp**, Twilio, or automatic external sending. The
 ## What’s included
 
 - Multi-bot switcher + create bot + per-bot `.txt` / `.md` knowledge upload
+- **Knowledge** modal — list uploaded files and preview full contents
 - WhatsApp-inspired three-pane desk: conversation list · chat · AI draft copilot
 - Seeded **Demo Shop Support** bot with sample policy and threads
 - Act as **Customer** or **Agent**; **+ New chat** for new conversations
@@ -82,7 +83,7 @@ Drafts only — **no real WhatsApp**, Twilio, or automatic external sending. The
 | `GET` | `/status` | `ollama_ok`, `bot_count`, `db_ok` |
 | `GET` / `POST` | `/bots` | List / create bots |
 | `GET` | `/bots/{id}` | Bot detail |
-| `GET` / `POST` | `/bots/{id}/knowledge` | List docs / upload `.txt`/`.md` |
+| `GET` / `POST` | `/bots/{id}/knowledge` | List docs (with `content_text`) / upload `.txt`/`.md` |
 | `GET` / `POST` | `/bots/{id}/threads` | List / create conversations |
 | `GET` | `/threads/{id}` | Thread + messages + latest draft |
 | `POST` | `/threads/{id}/messages` | Append customer (or agent) message |

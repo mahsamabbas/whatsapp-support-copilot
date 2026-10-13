@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { BotModal } from './components/BotModal'
+import { KnowledgeModal } from './components/KnowledgeModal'
 import { ChatPane } from './components/ChatPane'
 import { DraftPanel, type DraftView } from './components/DraftPanel'
 import { ThreadList, type ThreadWithRole } from './components/ThreadList'
@@ -67,6 +68,8 @@ export default function App() {
   const [bots, setBots] = useState<Bot[]>([])
   const [activeBotId, setActiveBotId] = useState<number | null>(null)
   const [isBotModalOpen, setIsBotModalOpen] = useState(false)
+  const [isKnowledgeModalOpen, setIsKnowledgeModalOpen] = useState(false)
+  const [knowledgeRevision, setKnowledgeRevision] = useState(0)
   const [threads, setThreads] = useState<ThreadWithRole[]>([])
   const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null)
   const [selectedThread, setSelectedThread] = useState<ThreadDetail | null>(null)
@@ -374,14 +377,17 @@ export default function App() {
 
   const selectedThreadSummary =
     threads.find((thread) => thread.id === selectedThreadId) ?? null
+  const activeBotName = bots.find((bot) => bot.id === activeBotId)?.name ?? null
 
   return (
     <div className="app">
       <TopBar
         bots={bots}
         activeBotId={activeBotId}
+        knowledgeRevision={knowledgeRevision}
         onBotChange={setActiveBotId}
         onCreateBot={() => setIsBotModalOpen(true)}
+        onViewKnowledge={() => setIsKnowledgeModalOpen(true)}
       />
 
       <div className="workspace">
@@ -448,11 +454,20 @@ export default function App() {
         onClose={() => {
           setIsBotModalOpen(false)
           void loadBots()
+          setKnowledgeRevision((value) => value + 1)
         }}
         onBotCreated={(bot) => {
           setBots((currentBots) => [...currentBots, bot])
           setActiveBotId(bot.id)
         }}
+      />
+
+      <KnowledgeModal
+        open={isKnowledgeModalOpen}
+        botId={activeBotId}
+        botName={activeBotName}
+        onClose={() => setIsKnowledgeModalOpen(false)}
+        onKnowledgeChanged={() => setKnowledgeRevision((value) => value + 1)}
       />
     </div>
   )

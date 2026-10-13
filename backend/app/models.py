@@ -21,6 +21,7 @@ class KnowledgeDocumentResponse(BaseModel):
     id: int
     bot_id: int
     filename: str
+    content_text: str
     created_at: str
 
 
