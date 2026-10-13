@@ -274,14 +274,37 @@ export default function App() {
     try {
       const result = await generateDraft(threadId)
       if (isStale()) return
-      setDraftView({
-        draftId: result.draft_id,
-        body: result.body,
-        confidence: result.confidence,
-        sources: result.sources,
-        escalated: result.escalated,
-        reason: result.reason,
-      })
+
+      // Option A: grounded drafts auto-approve + simulated send. Escalated
+      // drafts stay in the panel for a human — never invent-and-send.
+      if (!result.escalated && result.body.trim()) {
+        setDraftView({
+          draftId: result.draft_id,
+          body: result.body,
+          confidence: result.confidence,
+          sources: result.sources,
+          escalated: false,
+          reason: null,
+        })
+        setIsApprovingDraft(true)
+        try {
+          await approveDraft(threadId, result.body)
+          if (isStale()) return
+          setDraftView(null)
+        } finally {
+          if (!isStale()) setIsApprovingDraft(false)
+        }
+      } else {
+        setDraftView({
+          draftId: result.draft_id,
+          body: result.body,
+          confidence: result.confidence,
+          sources: result.sources,
+          escalated: result.escalated,
+          reason: result.reason,
+        })
+      }
+
       await loadThread(threadId, isStale)
       if (isStale()) return
       await refreshThreadsList()

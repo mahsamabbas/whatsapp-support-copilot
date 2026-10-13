@@ -51,7 +51,9 @@ export function DraftPanel({
       <section className="pane pane-draft" data-active={active}>
         <div className="draft-header">
           <h2 className="draft-title">Copilot</h2>
-          <p className="draft-sub">Grounded suggestions for this conversation</p>
+          <p className="draft-sub">
+            Grounded replies auto-send; unclear ones escalate for a human
+          </p>
         </div>
         <div className="draft-empty">Select a conversation to draft a reply.</div>
       </section>
@@ -74,7 +76,9 @@ export function DraftPanel({
     <section className="pane pane-draft" data-active={active}>
       <div className="draft-header">
         <h2 className="draft-title">Copilot</h2>
-        <p className="draft-sub">Grounded suggestions for this conversation</p>
+        <p className="draft-sub">
+          Grounded replies auto-send; unclear ones escalate for a human
+        </p>
       </div>
 
       <div className="draft-body">
@@ -167,7 +171,7 @@ export function DraftPanel({
             disabled={!canApprove}
             onClick={() => onApprove(body.trim())}
           >
-            {isApproving ? 'Sending…' : 'Approve & send'}
+            {isApproving ? 'Sending…' : 'Send edited reply'}
           </button>
         )}
         <button

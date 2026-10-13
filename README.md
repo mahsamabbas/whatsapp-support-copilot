@@ -4,7 +4,7 @@
 
 Drafts only — **no real WhatsApp**, Twilio, or automatic external sending. The browser never calls Ollama.
 
-**Flow:** Agent opens a thread → FastAPI retrieves policy chunks (FAISS) for that bot → Ollama (`qwen2.5:7b`) drafts a short reply (or escalates on low confidence) → human **Approve & send** (SQLite agent message) or **Escalate**.
+**Flow:** Agent opens a thread → FastAPI retrieves policy chunks (FAISS) for that bot → Ollama (`qwen2.5:7b`) drafts a short reply → **grounded drafts auto-send** into the thread (simulated); low-confidence cases **escalate** for a human instead of inventing an answer.
 
 ## What’s included
 
@@ -13,8 +13,9 @@ Drafts only — **no real WhatsApp**, Twilio, or automatic external sending. The
 - Seeded **Demo Shop Support** bot with sample policy and threads
 - Act as **Customer** or **Agent**; **+ New chat** for new conversations
 - Grounded drafts with confidence + source excerpts
+- **Auto-send** after a successful grounded generate (edit + “Send edited reply” still available)
 - Auto-escalate below similarity cutoff + manual escalate anytime
-- Approve = simulated send into the thread (persisted in SQLite)
+- Send = simulated agent message in SQLite (not real WhatsApp)
 - Docker Compose (nginx frontend + FastAPI); Ollama on the host
 
 ## Tech stack
@@ -150,7 +151,7 @@ On first API start, SQLite seeds **Demo Shop Support** + sample policy + sample 
 ## Multi-bot demo
 
 1. Select **Demo Shop Support** → open a customer thread (e.g. returns question).
-2. **Generate** draft → review sources → **Approve & send** (or open the off-topic thread and see auto-escalate).
+2. **Generate** (or send a customer message) → grounded reply **auto-sends** into the thread; open the off-topic thread to see auto-escalate instead.
 3. **Create bot** → upload your own `.txt`/`.md` policy (200–12,000 chars, UTF-8).
 4. **+ New chat** → Act as **Customer** → message → Generate. Knowledge stays isolated per bot.
 
