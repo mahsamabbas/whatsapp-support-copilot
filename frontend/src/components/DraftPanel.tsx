@@ -55,7 +55,9 @@ export function DraftPanel({
             Grounded replies auto-send; unclear ones escalate for a human
           </p>
         </div>
-        <div className="draft-empty">Select a conversation to draft a reply.</div>
+        <div className="draft-body">
+          <div className="draft-empty">Select a conversation to draft a reply.</div>
+        </div>
       </section>
     )
   }
