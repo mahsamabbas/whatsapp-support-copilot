@@ -121,24 +121,29 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (activeBotId === null) {
-      setThreads([])
-      setSelectedThreadId(null)
-      setSelectedThread(null)
-      return
-    }
+    // Bot switch must wipe inbox + copilot state so a previous bot's draft
+    // never sticks around when the new bot has no conversation selected.
+    draftRequestIdRef.current += 1
+    setThreads([])
+    setSelectedThreadId(null)
+    setSelectedThread(null)
+    setDraftView(null)
+    setDraftError(null)
+    setDraftLoading(false)
+    setPulseGenerate(false)
+    setIsApprovingDraft(false)
+    setIsEscalatingThread(false)
+    setFlashThreadId(null)
+    setThreadError(null)
+
+    if (activeBotId === null) return
 
     let cancelled = false
-    setThreadError(null)
     void listThreads(activeBotId)
       .then((nextThreads) => {
         if (cancelled) return
         setThreads(nextThreads)
-        setSelectedThreadId((currentThreadId) =>
-          currentThreadId !== null && nextThreads.some((thread) => thread.id === currentThreadId)
-            ? currentThreadId
-            : (nextThreads[0]?.id ?? null),
-        )
+        setSelectedThreadId(nextThreads[0]?.id ?? null)
       })
       .catch(() => {
         if (!cancelled) {
@@ -179,19 +184,25 @@ export default function App() {
   }
 
   useEffect(() => {
-    if (selectedThreadId === null) return
+    draftRequestIdRef.current += 1
+    setDraftLoading(false)
+    setPulseGenerate(false)
+    setDraftError(null)
+
+    if (selectedThreadId === null) {
+      setSelectedThread(null)
+      setDraftView(null)
+      return
+    }
+
     const threadId = selectedThreadId
     let cancelled = false
     setThreadError(null)
-    setDraftError(null)
-    setPulseGenerate(false)
     // Invalidate any in-flight draft request for the previous thread and
     // reset the loading flag immediately — otherwise, if that request's
     // `finally` happens to run after this switch, the newly selected
     // thread could be left stuck showing "Generating…" (or, conversely,
     // the old thread's result could flip loading back on for this thread).
-    draftRequestIdRef.current += 1
-    setDraftLoading(false)
     void loadThread(threadId, () => cancelled)
       .then((detail) => {
         if (!cancelled) setDraftView(hydrateDraftView(detail))
